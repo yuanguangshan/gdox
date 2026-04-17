@@ -211,7 +211,7 @@ func parseFlags() Config {
 	pflag.Parse()
 
 	if cfg.Version {
-		fmt.Printf("gen-docs %s\n", versionStr)
+		fmt.Printf("gdox %s\n", versionStr)
 		os.Exit(0)
 	}
 
@@ -354,11 +354,11 @@ func formatSize(b int64) string {
 }
 
 // ============================================================
-//  Ignore File Loading (.gen-docs-ignore)
+//  Ignore File Loading (.gdoxignore)
 // ============================================================
 
 func loadIgnoreFile(rootDir string) (extExcludes, pathExcludes []string) {
-	candidates := []string{".gen-docs-ignore", ".gdocsignore", ".docs-ignore"}
+	candidates := []string{".gdoxignore", ".gdocsignore", ".docs-ignore"}
 	for _, name := range candidates {
 		p := filepath.Join(rootDir, name)
 		f, err := os.Open(p)
@@ -806,7 +806,7 @@ func printDryRunReport(cfg Config, files []FileMetadata, stats Stats, skippedFil
 // ============================================================
 
 func printStartupInfo(cfg Config) {
-	fmt.Println("▶ Gen-Docs Started")
+	fmt.Println("▶ gdox Started")
 	fmt.Printf("  Root: %s\n", cfg.RootDir)
 	fmt.Printf("  Out : %s\n", cfg.OutputFile)
 	fmt.Printf("  Max : %d KB\n", cfg.MaxFileSize/1024)

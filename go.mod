@@ -1,4 +1,4 @@
-module gen-docs
+module gdox
 
 go 1.21
 
