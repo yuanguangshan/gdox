@@ -1,15 +1,15 @@
 {
   "name": "@yuanguangshan/gdox",
-  "version": "1.0.1",
+  "version": "2.0.1",
   "description": "一键生成项目代码快照，为 AI 辅助开发与架构审计而生。",
   "main": "index.js",
   "bin": {
     "gdox": "index.js"
   },
   "scripts": {
-    "build": "GOOS=darwin GOARCH=amd64 go build -o gdox-darwin-amd64 gdox.go && GOOS=darwin GOARCH=arm64 go build -o gdox-darwin-arm64 gdox.go && GOOS=linux GOARCH=amd64 go build -o gdox-linux-amd64 gdox.go && GOOS=linux GOARCH=arm64 go build -o gdox-linux-arm64 gdox.go && GOOS=windows GOARCH=amd64 go build -o gdox-win-amd64.exe gdox.go",
+    "build": "VERSION=$(node -p \"require('./package.json').version\") && LDFLAGS=\"-X main.versionStr=v$VERSION\" && GOOS=darwin GOARCH=amd64 go build -ldflags \"$LDFLAGS\" -o gdox-darwin-amd64 gdox.go && GOOS=darwin GOARCH=arm64 go build -ldflags \"$LDFLAGS\" -o gdox-darwin-arm64 gdox.go && GOOS=linux GOARCH=amd64 go build -ldflags \"$LDFLAGS\" -o gdox-linux-amd64 gdox.go && GOOS=linux GOARCH=arm64 go build -ldflags \"$LDFLAGS\" -o gdox-linux-arm64 gdox.go && GOOS=windows GOARCH=amd64 go build -ldflags \"$LDFLAGS\" -o gdox-win-amd64.exe gdox.go",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "go test ./..."
   },
   "files": [
     "index.js",
@@ -24,7 +24,18 @@
     "type": "git",
     "url": "git+https://github.com/yuanguangshan/gen-docs.git"
   },
-  "keywords": [],
+  "keywords": [
+    "code-snapshot",
+    "markdown",
+    "ai",
+    "llm",
+    "gpt",
+    "claude",
+    "code-to-markdown",
+    "code-review",
+    "documentation",
+    "gdox"
+  ],
   "author": "苑广山",
   "license": "ISC",
   "type": "commonjs",
