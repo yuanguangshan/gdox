@@ -1,4 +1,5 @@
-gdox
-!*.go
+/gdox
+gdox.exe
 node_modules
 *.log
+
