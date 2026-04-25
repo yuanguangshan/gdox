@@ -104,6 +104,12 @@ var ignoreFiles = map[string]bool{
 	"coverage.xml": true, "thumbs.db": true,
 }
 
+var knownTextFiles = map[string]bool{
+	"Makefile": true, "Dockerfile": true, "Rakefile": true, "Gemfile": true,
+	"CMakeLists.txt": true, "Vagrantfile": true, "Jenkinsfile": true,
+	"README": true, "LICENSE": true, "CHANGELOG": true, "CONTRIBUTING": true,
+}
+
 var languageMap = map[string]string{
 	".go": "go", ".js": "javascript", ".ts": "typescript", ".py": "python",
 	".c": "c", ".cpp": "cpp", ".h": "cpp", ".hpp": "cpp", ".cc": "cpp",
@@ -229,10 +235,11 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 	}
 	var skipped []SkippedFile
 
-	gitPatterns := []string{}
+	var ignorePatterns []string
 	if !config.NoGitignore {
-		gitPatterns = loadGitignore(config.RootDir)
+		ignorePatterns = loadGitignore(config.RootDir)
 	}
+	ignorePatterns = append(ignorePatterns, loadGdignore(config.RootDir)...)
 
 	filepath.WalkDir(config.RootDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil { return nil }
@@ -240,15 +247,24 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 		if relPath == "." { return nil }
 
 		if d.IsDir() {
-			if shouldIgnoreDir(relPath, config, gitPatterns) { return filepath.SkipDir }
+			if shouldIgnoreDir(relPath, config, ignorePatterns) { return filepath.SkipDir }
 			if config.NoSubdirs && strings.Contains(relPath, string(filepath.Separator)) { return filepath.SkipDir }
 			stats.DirCount++
 			return nil
 		}
 
 		stats.PotentialMatches++
-		if shouldIgnoreFile(relPath, config, gitPatterns) {
+		if shouldIgnoreFile(relPath, config, ignorePatterns) {
 			stats.ExplicitlyExcluded++
+			return nil
+		}
+
+		// Skip output file
+		outRel := config.OutputFile
+		if filepath.IsAbs(outRel) {
+			outRel, _ = filepath.Rel(config.RootDir, outRel)
+		}
+		if relPath == outRel {
 			return nil
 		}
 
@@ -259,7 +275,7 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 			return nil
 		}
 
-		if isBinaryFile(path) {
+		if !isKnownTextFile(relPath) && isBinaryFile(path) {
 			skipped = append(skipped, SkippedFile{relPath, "Binary file"})
 			stats.Skipped++
 			return nil
@@ -324,7 +340,15 @@ func shouldIgnoreFile(relPath string, config Config, gitPatterns []string) bool 
 }
 
 func loadGitignore(root string) []string {
-	data, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	return loadIgnoreFile(filepath.Join(root, ".gitignore"))
+}
+
+func loadGdignore(root string) []string {
+	return loadIgnoreFile(filepath.Join(root, ".gdignore"))
+}
+
+func loadIgnoreFile(path string) []string {
+	data, err := os.ReadFile(path)
 	if err != nil { return nil }
 	var res []string
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -356,6 +380,14 @@ func isBinaryFile(path string) bool {
 		for _, b := range buf[:n] { if b == 0 { return true } }
 	}
 	return false
+}
+
+func isKnownTextFile(relPath string) bool {
+	name := filepath.Base(relPath)
+	if knownTextFiles[name] { return true }
+	ext := strings.ToLower(filepath.Ext(relPath))
+	_, ok := languageMap[ext]
+	return ok
 }
 
 func countLines(path string) int {
