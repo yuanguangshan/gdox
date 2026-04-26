@@ -7,17 +7,14 @@
     "gdox": "index.js"
   },
   "scripts": {
+    "postinstall": "node download-binary.js",
     "build": "VERSION=$(node -p \"require('./package.json').version\") && LDFLAGS=\"-X main.versionStr=v${VERSION}\" && echo \"Building gdox v${VERSION} ...\" && GOOS=darwin GOARCH=amd64 go build -ldflags \"$LDFLAGS\" -o gdox-darwin-amd64 gdox.go && GOOS=darwin GOARCH=arm64 go build -ldflags \"$LDFLAGS\" -o gdox-darwin-arm64 gdox.go && GOOS=linux GOARCH=amd64 go build -ldflags \"$LDFLAGS\" -o gdox-linux-amd64 gdox.go && GOOS=linux GOARCH=arm64 go build -ldflags \"$LDFLAGS\" -o gdox-linux-arm64 gdox.go && GOOS=windows GOARCH=amd64 go build -ldflags \"$LDFLAGS\" -o gdox-win-amd64.exe gdox.go && echo \"Done.\"",
     "prepublishOnly": "npm run build",
     "test": "go test ./..."
   },
   "files": [
     "index.js",
-    "gdox-darwin-amd64",
-    "gdox-darwin-arm64",
-    "gdox-linux-amd64",
-    "gdox-linux-arm64",
-    "gdox-win-amd64.exe",
+    "download-binary.js",
     "README.md"
   ],
   "repository": {

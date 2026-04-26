@@ -1,5 +1,9 @@
 /gdox
 gdox.exe
+gdox-darwin-*
+gdox-linux-*
+gdox-win-*.exe
+*.tar.gz
 node_modules
 *.log
 .DS_Store
