@@ -1,8 +1,8 @@
-/godoc
-godoc.exe
-godoc-darwin-*
-godoc-linux-*
-godoc-win-*.exe
+/sourcepack
+sourcepack.exe
+sourcepack-darwin-*
+sourcepack-linux-*
+sourcepack-win-*.exe
 *.tar.gz
 node_modules
 *.log

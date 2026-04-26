@@ -173,3 +173,28 @@ func TestGenerateAnchor(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildTreeString(t *testing.T) {
+	files := []FileMetadata{
+		{RelPath: "cmd/app/main.go"},
+		{RelPath: "cmd/app/util.go"},
+		{RelPath: "go.mod"},
+		{RelPath: "internal/handler.go"},
+		{RelPath: "README.md"},
+	}
+
+	got := buildTreeString(files, "myproject")
+	want := `myproject/
+├── cmd/
+│   └── app/
+│       ├── main.go
+│       └── util.go
+├── internal/
+│   └── handler.go
+├── README.md
+└── go.mod
+`
+	if got != want {
+		t.Errorf("buildTreeString() =\n%s\nwant:\n%s", got, want)
+	}
+}
