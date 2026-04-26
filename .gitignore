@@ -7,3 +7,4 @@ gdox-win-*.exe
 node_modules
 *.log
 .DS_Store
+project_snapshot.md
