@@ -1,4 +1,4 @@
-# Sourcepack (gd)
+# Sourcepack (gdoc)
 
 **一键将项目代码库转换为 AI 可读的 Markdown 快照。**
 
@@ -16,15 +16,15 @@ bash install-godoc.sh
 
 ```bash
 sourcepack          # 主命令（与包名一致）
-gd                  # 快捷命令
-gd -i go,md         # 只包含 Go 和 Markdown 文件
-gd -x exe,bin       # 排除特定后缀
-gd -X vendor        # 排除指定目录关键字
-gd -n               # 不扫描子目录
-gd --dry-run        # 预览文件列表
+gdoc                # 快捷命令
+gdoc -i go,md       # 只包含 Go 和 Markdown 文件
+gdoc -x exe,bin     # 排除特定后缀
+gdoc -X vendor      # 排除指定目录关键字
+gdoc -n             # 不扫描子目录
+gdoc --dry-run      # 预览文件列表
 ```
 
-> `sourcepack`、`godoc`、`gd` 三个命令完全等效。
+> `sourcepack` 和 `gdoc` 两个命令完全等效。
 
 ## 特性
 
