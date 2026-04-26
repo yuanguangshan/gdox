@@ -5,6 +5,7 @@
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="godoc"
 SHORTCUT_NAME="gd"
+PACK_NAME="sourcepack"
 SOURCE_FILE="godoc.go"
 
 # 检查权限
@@ -16,7 +17,7 @@ fi
 # 卸载逻辑
 if [[ "$1" == "--uninstall" ]]; then
     echo "🗑 卸载 Godoc..."
-    $USE_SUDO rm -f "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$SHORTCUT_NAME"
+    $USE_SUDO rm -f "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$SHORTCUT_NAME" "$INSTALL_DIR/$PACK_NAME"
     
     # 额外检查 ~/.local/bin 以防万一
     if [[ -f "$HOME/.local/bin/$SHORTCUT_NAME" ]]; then
@@ -55,8 +56,9 @@ $USE_SUDO mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
 $USE_SUDO chmod +x "$INSTALL_DIR/$BINARY_NAME"
 
 # 创建/更新快捷命令
-echo "🔗 创建快捷命令 $SHORTCUT_NAME..."
+echo "🔗 创建快捷命令 $SHORTCUT_NAME / $PACK_NAME..."
 $USE_SUDO ln -sf "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$SHORTCUT_NAME"
+$USE_SUDO ln -sf "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$PACK_NAME"
 
 # 检查是否由于 PATH 优先级导致旧版本干扰
 EXISTING_GD=$(which $SHORTCUT_NAME)
@@ -69,5 +71,6 @@ echo -e "\n✅ 安装完成！"
 "$INSTALL_DIR/$BINARY_NAME" --version
 
 echo -e "\n现在你可以运行："
-echo "  godoc         # 完整命令"
+echo "  sourcepack   # 主命令（与包名一致）"
+echo "  godoc        # 经典命令"
 echo "  gd           # 快捷命令"

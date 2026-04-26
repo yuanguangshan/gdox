@@ -1,4 +1,4 @@
-module github.com/yuanguangshan/godoc
+module github.com/yuanguangshan/sourcepack
 
 go 1.21
 
