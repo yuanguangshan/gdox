@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -464,7 +465,10 @@ func matchPattern(path, pattern string) bool {
 }
 
 func isBinaryFile(path string) bool {
-	f, _ := os.Open(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
 	defer f.Close()
 	buf := make([]byte, 1024)
 	n, _ := f.Read(buf)
@@ -484,7 +488,10 @@ func isKnownTextFile(relPath string) bool {
 }
 
 func countLines(path string) int {
-	f, _ := os.Open(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
 	defer f.Close()
 	s := bufio.NewScanner(f)
 	n := 0
@@ -838,7 +845,8 @@ func pushToRemote(content, url, authKey string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("server returned %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return nil
 }
