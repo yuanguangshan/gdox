@@ -46,5 +46,18 @@ gdoc -v             # 详细模式（显示扫描过程）
 - **便捷**: `-c` 一键复制到剪贴板，`-p` 一键推送到远端。
 - **清晰**: 自动生成带跳转链接的项目目录树。
 
+## 远端推送
+
+通过 `-p` 将快照推送到远端中继服务（如 knasync）：
+
+```bash
+export SOURCEPACK_PUSH_URL="https://your-endpoint/api/submit"
+export SOURCEPACK_AUTH_KEY="your-secret"
+sourcepack -p           # 推送完整文档
+sourcepack -s -p        # 只推送统计数据
+```
+
+也可通过命令行参数 `--auth-key` 直接传入密钥。
+
 ---
 *Simple, Fast, and AI-Friendly.*
