@@ -352,7 +352,13 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 	}
 
 	filepath.WalkDir(config.RootDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil { return nil }
+		if err != nil {
+			if config.Verbose {
+				fmt.Printf("  ! Warning: cannot access %s: %v\n", path, err)
+			}
+			if d != nil && d.IsDir() { return filepath.SkipDir }
+			return nil
+		}
 		relPath, _ := filepath.Rel(config.RootDir, path)
 		if relPath == "." { return nil }
 
@@ -658,27 +664,50 @@ func writeContent(config Config, files []FileMetadata, stats Stats, w io.Writer)
 	for _, f := range files {
 		fmt.Fprintf(bw, "\n## %s\n\n", f.RelPath)
 
-		// Stream file content in chunks to determine fence and write
-		maxBacktick, err := scanMaxBackticks(f.FullPath)
-		if err != nil {
-			return fmt.Errorf("reading %s: %w", f.RelPath, err)
+		// Stream file content: small files read once, large files scan + copy
+		var content []byte
+		var readErr error
+		smallLimit := int64(32 * 1024)
+		if f.Size <= smallLimit {
+			content, readErr = os.ReadFile(f.FullPath)
+			if readErr != nil {
+				return fmt.Errorf("reading %s: %w", f.RelPath, readErr)
+			}
+		} else {
+			// Large file: scan backticks via chunked read, then io.Copy
+			maxBacktick, scanErr := scanMaxBackticks(f.FullPath)
+			if scanErr != nil {
+				return fmt.Errorf("scanning %s: %w", f.RelPath, scanErr)
+			}
+			fence := "```"
+			if maxBacktick >= 3 {
+				fence = strings.Repeat("`", maxBacktick+1)
+			}
+			lang := detectLanguage(f.RelPath)
+			fmt.Fprintf(bw, "%s%s\n", fence, lang)
+
+			src, openErr := os.Open(f.FullPath)
+			if openErr != nil {
+				return fmt.Errorf("opening %s: %w", f.RelPath, openErr)
+			}
+			if _, copyErr := io.Copy(bw, src); copyErr != nil {
+				src.Close()
+				return fmt.Errorf("copying %s: %w", f.RelPath, copyErr)
+			}
+			src.Close()
+
+			bw.WriteByte('\n')
+			fmt.Fprintf(bw, "%s\n", fence)
+			continue
 		}
+		maxBacktick := scanBackticksInData(content)
 		fence := "```"
 		if maxBacktick >= 3 {
 			fence = strings.Repeat("`", maxBacktick+1)
 		}
 		lang := detectLanguage(f.RelPath)
 		fmt.Fprintf(bw, "%s%s\n", fence, lang)
-
-		src, err := os.Open(f.FullPath)
-		if err != nil {
-			return fmt.Errorf("opening %s: %w", f.RelPath, err)
-		}
-		if _, err := io.Copy(bw, src); err != nil {
-			src.Close()
-			return fmt.Errorf("copying %s: %w", f.RelPath, err)
-		}
-		src.Close()
+		bw.Write(content)
 
 		// Ensure trailing newline before closing fence
 		bw.WriteByte('\n')
@@ -758,6 +787,23 @@ func scanMaxBackticks(path string) (int, error) {
 		}
 	}
 	return maxRun, nil
+}
+
+// scanBackticksInData is the in-memory variant of scanMaxBackticks,
+// used for small files that are already fully read.
+func scanBackticksInData(data []byte) int {
+	maxRun, curRun := 0, 0
+	for _, b := range data {
+		if b == '`' {
+			curRun++
+			if curRun > maxRun {
+				maxRun = curRun
+			}
+		} else {
+			curRun = 0
+		}
+	}
+	return maxRun
 }
 
 func generateAnchor(p string) string {
