@@ -146,6 +146,13 @@ func main() {
 		return
 	}
 
+	if err := run(config); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run(config Config) error {
 	if config.Verbose {
 		printConfigSummary(config)
 	}
@@ -168,85 +175,64 @@ func main() {
 		}
 	}
 
-	// 2. Output to Terminal
+	// 2. Dry-run: terminal output only
 	if config.DryRun {
 		printDryRun(files, stats, skipped)
+		printStatsTerminal(files, stats)
+		return nil
 	}
 
+	// 3. Stats-only mode
 	if config.ShowStats {
 		printStatsTerminal(files, stats)
 		if config.Push {
 			if config.PushURL == "" {
-				fmt.Println("❌ SOURCEPACK_PUSH_URL env is required for push")
-				os.Exit(1)
+				return fmt.Errorf("SOURCEPACK_PUSH_URL env is required for push")
 			}
 			if err := pushStatsToRemote(config, files, stats); err != nil {
-				fmt.Printf("❌ Failed to push: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to push stats: %w", err)
 			}
-			fmt.Printf("\n✨ Done! Pushed stats to %s in %v\n", config.PushURL, time.Since(startTime))
 		}
-		return
+		fmt.Printf("\n✨ Done! in %v\n", time.Since(startTime))
+		return nil
 	}
 
-	if config.DryRun {
-		printStatsTerminal(files, stats)
-		return
-	}
-
-	// 3. Generate and stream output
+	// 4. Full output modes
 	if config.Copy {
 		if err := copyToClipboardStreaming(config, files, stats); err != nil {
-			fmt.Printf("❌ Failed to copy: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to copy: %w", err)
 		}
 		fmt.Printf("\n✨ Done! Copied to clipboard in %v\n", time.Since(startTime))
-	} else if config.Push {
+		return nil
+	}
+
+	if config.Push {
 		if config.PushURL == "" {
-			fmt.Println("❌ SOURCEPACK_PUSH_URL env is required for push")
-			os.Exit(1)
+			return fmt.Errorf("SOURCEPACK_PUSH_URL env is required for push")
 		}
 		if err := pushToRemoteStreaming(config, files, stats); err != nil {
-			fmt.Printf("❌ Failed to push: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to push: %w", err)
 		}
 		fmt.Printf("\n✨ Done! Pushed to %s in %v\n", config.PushURL, time.Since(startTime))
-	} else if config.ICloud {
-		homeDir, _ := os.UserHomeDir()
-		icloudDir := filepath.Join(homeDir, "Library", "Mobile Documents", "com~apple~CloudDocs", "Documents")
-		if err := os.MkdirAll(icloudDir, 0755); err != nil {
-			fmt.Printf("❌ Cannot create iCloud directory: %v\n", err)
-			os.Exit(1)
-		}
-		folderName := filepath.Base(config.RootDir)
-		dateStr := time.Now().Format("2006-01-02")
-		icloudPath := filepath.Join(icloudDir, folderName+"+"+dateStr+".md")
-		outFile, err := os.Create(icloudPath)
-		if err != nil {
-			fmt.Printf("❌ Error creating iCloud file: %v\n", err)
-			os.Exit(1)
-		}
-		if err := writeContent(config, files, stats, outFile); err != nil {
-			outFile.Close()
-			fmt.Printf("❌ Error writing content: %v\n", err)
-			os.Exit(1)
-		}
-		outFile.Close()
-		fmt.Printf("\n✨ Done! Saved to iCloud: %s in %v\n", icloudPath, time.Since(startTime))
-	} else {
-		outFile, err := os.Create(config.OutputFile)
-		if err != nil {
-			fmt.Printf("❌ Error creating file: %v\n", err)
-			os.Exit(1)
-		}
-		if err := writeContent(config, files, stats, outFile); err != nil {
-			outFile.Close()
-			fmt.Printf("❌ Error writing content: %v\n", err)
-			os.Exit(1)
-		}
-		outFile.Close()
-		fmt.Printf("\n✨ Done! Generated %s in %v\n", config.OutputFile, time.Since(startTime))
+		return nil
 	}
+
+	if config.ICloud {
+		return saveToICloud(config, files, stats, startTime)
+	}
+
+	// Default: write to output file
+	outFile, err := os.Create(config.OutputFile)
+	if err != nil {
+		return fmt.Errorf("creating %s: %w", config.OutputFile, err)
+	}
+	if err := writeContent(config, files, stats, outFile); err != nil {
+		outFile.Close()
+		return fmt.Errorf("writing content: %w", err)
+	}
+	outFile.Close()
+	fmt.Printf("\n✨ Done! Generated %s in %v\n", config.OutputFile, time.Since(startTime))
+	return nil
 }
 
 func parseFlags() Config {
@@ -302,8 +288,9 @@ func parseFlags() Config {
 	if addIgnores != "" { c.AdditionalIgnores = cleanList(addIgnores) }
 
 	c.MaxFileSize *= 1024
-	absRoot, _ := filepath.Abs(c.RootDir)
-	c.RootDir = absRoot
+	if absRoot, err := filepath.Abs(c.RootDir); err == nil {
+		c.RootDir = absRoot
+	}
 
 	return c
 }
@@ -351,7 +338,7 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 		if gdCount > 0 { fmt.Printf("  Loaded .gdignore (%d patterns)\n", gdCount) }
 	}
 
-	filepath.WalkDir(config.RootDir, func(path string, d fs.DirEntry, err error) error {
+	walkErr := filepath.WalkDir(config.RootDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if config.Verbose {
 				fmt.Printf("  ! Warning: cannot access %s: %v\n", path, err)
@@ -359,7 +346,13 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 			if d != nil && d.IsDir() { return filepath.SkipDir }
 			return nil
 		}
-		relPath, _ := filepath.Rel(config.RootDir, path)
+		relPath, err := filepath.Rel(config.RootDir, path)
+		if err != nil {
+			if config.Verbose {
+				fmt.Printf("  ! Warning: cannot compute relative path %s: %v\n", path, err)
+			}
+			return nil
+		}
 		if relPath == "." { return nil }
 
 		if d.IsDir() {
@@ -378,28 +371,35 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 		// Skip output file
 		outRel := config.OutputFile
 		if filepath.IsAbs(outRel) {
-			outRel, _ = filepath.Rel(config.RootDir, outRel)
+			if r, err := filepath.Rel(config.RootDir, outRel); err == nil {
+				outRel = r
+			}
 		}
 		if relPath == outRel {
 			return nil
 		}
 
-		info, _ := d.Info()
-		if info.Size() > config.MaxFileSize {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			skipped = append(skipped, SkippedFile{relPath, "Read error"})
+			stats.Skipped++
+			return nil
+		}
+		if int64(len(data)) > config.MaxFileSize {
 			skipped = append(skipped, SkippedFile{relPath, "Size limit"})
 			stats.Skipped++
 			return nil
 		}
 
-		if !isKnownTextFile(relPath) && isBinaryFile(path) {
+		if !isKnownTextFile(relPath) && isBinaryBuffer(data) {
 			skipped = append(skipped, SkippedFile{relPath, "Binary file"})
 			stats.Skipped++
 			return nil
 		}
 
-		lineCount := countLines(path)
-		tokens := estimateTokens(path)
-		fMeta := FileMetadata{RelPath: relPath, FullPath: path, Size: info.Size(), LineCount: lineCount}
+		lineCount := countLinesBuffer(data)
+		tokens := len(data) / 4
+		fMeta := FileMetadata{RelPath: relPath, FullPath: path, Size: int64(len(data)), LineCount: lineCount}
 		files = append(files, fMeta)
 
 		if config.Verbose {
@@ -427,6 +427,9 @@ func scanDirectory(config Config) ([]FileMetadata, Stats, []SkippedFile) {
 
 		return nil
 	})
+	if walkErr != nil && config.Verbose {
+		fmt.Printf("  ! Walk error: %v\n", walkErr)
+	}
 
 	return files, stats, skipped
 }
@@ -490,17 +493,10 @@ func matchPattern(path, pattern string) bool {
 	return m
 }
 
-func isBinaryFile(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-	buf := make([]byte, 1024)
-	n, _ := f.Read(buf)
-	if n == 0 { return false }
-	if !utf8.Valid(buf[:n]) {
-		for _, b := range buf[:n] { if b == 0 { return true } }
+func isBinaryBuffer(buf []byte) bool {
+	if len(buf) == 0 { return false }
+	if !utf8.Valid(buf) {
+		for _, b := range buf { if b == 0 { return true } }
 	}
 	return false
 }
@@ -513,24 +509,10 @@ func isKnownTextFile(relPath string) bool {
 	return ok
 }
 
-func countLines(path string) int {
-	f, err := os.Open(path)
-	if err != nil {
-		return 0
-	}
-	defer f.Close()
-	s := bufio.NewScanner(f)
+func countLinesBuffer(data []byte) int {
 	n := 0
-	for s.Scan() { n++ }
+	for _, b := range data { if b == '\n' { n++ } }
 	return n
-}
-
-// estimateTokens provides a rough token count estimate for LLM context sizing.
-// Uses the heuristic of ~1 token per 4 characters (approximates cl100k_base).
-func estimateTokens(path string) int {
-	data, err := os.ReadFile(path)
-	if err != nil { return 0 }
-	return len(data) / 4
 }
 
 // ============================================================
@@ -818,16 +800,6 @@ func detectLanguage(p string) string {
 	return ""
 }
 
-func determineFence(c string) string {
-	max := 0
-	cur := 0
-	for _, r := range c {
-		if r == '`' { cur++; if cur > max { max = cur } } else { cur = 0 }
-	}
-	if max < 3 { return "```" }
-	return strings.Repeat("`", max+1)
-}
-
 func printDryRun(files []FileMetadata, stats Stats, skipped []SkippedFile) {
 	fmt.Printf("\n🔍 Files to be included (%d):\n", len(files))
 	for _, f := range files { fmt.Printf("  - %-40s (%d lines)\n", f.RelPath, f.LineCount) }
@@ -923,6 +895,31 @@ func formatTree(sb *strings.Builder, node *treeNode, prefix string) {
 // ============================================================
 //  Clipboard Support
 // ============================================================
+
+func saveToICloud(config Config, files []FileMetadata, stats Stats, startTime time.Time) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	icloudDir := filepath.Join(homeDir, "Library", "Mobile Documents", "com~apple~CloudDocs", "Documents")
+	if err := os.MkdirAll(icloudDir, 0755); err != nil {
+		return fmt.Errorf("cannot create iCloud directory: %w", err)
+	}
+	folderName := filepath.Base(config.RootDir)
+	dateStr := time.Now().Format("2006-01-02")
+	icloudPath := filepath.Join(icloudDir, folderName+"+"+dateStr+".md")
+	outFile, err := os.Create(icloudPath)
+	if err != nil {
+		return fmt.Errorf("creating iCloud file %s: %w", icloudPath, err)
+	}
+	if err := writeContent(config, files, stats, outFile); err != nil {
+		outFile.Close()
+		return fmt.Errorf("writing content: %w", err)
+	}
+	outFile.Close()
+	fmt.Printf("\n✨ Done! Saved to iCloud: %s in %v\n", icloudPath, time.Since(startTime))
+	return nil
+}
 
 func copyToClipboardStreaming(config Config, files []FileMetadata, stats Stats) error {
 	var cmd *exec.Cmd

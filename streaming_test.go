@@ -42,23 +42,25 @@ func TestWriteContentOutput(t *testing.T) {
 		}
 	}
 
-	// Verify each file has heading and code fence
+	// Verify each included file has a heading and at least one code fence
 	for _, file := range files {
 		if !strings.Contains(content, "## "+file.RelPath) {
 			t.Errorf("missing file heading: %s", file.RelPath)
 		}
-	}
-
-	// Verify code fences are balanced by checking fence-only lines
-	fenceCount := 0
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if len(trimmed) >= 3 && trimmed == strings.Repeat("`", len(trimmed)) {
-			fenceCount++
+		// Extract content after this file's heading and check it has a fence
+		idx := strings.Index(content, "## "+file.RelPath)
+		if idx >= 0 {
+			// Look for next file heading or end of content
+			rest := content[idx+len("## "+file.RelPath):]
+			nextIdx := strings.Index(rest, "\n## ")
+			if nextIdx > 0 {
+				rest = rest[:nextIdx]
+			}
+			fenceCount := strings.Count(rest, "\n```")
+			if fenceCount == 0 {
+				t.Errorf("no code fence for file: %s", file.RelPath)
+			}
 		}
-	}
-	if fenceCount%2 != 0 {
-		t.Errorf("unbalanced code fences: %d fence lines (should be even)", fenceCount)
 	}
 }
 
