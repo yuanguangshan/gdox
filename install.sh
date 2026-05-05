@@ -4,7 +4,7 @@
 
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="sourcepack"
-SHORTCUT_NAME="gdoc"
+SHORTCUT_NAMES=("gdoc" "gdx" "gx" "doc")
 SOURCE_FILE="godoc.go"
 
 # 检查权限
@@ -16,7 +16,9 @@ fi
 # 卸载逻辑
 if [[ "$1" == "--uninstall" ]]; then
     echo "🗑 卸载 Sourcepack..."
-    $USE_SUDO rm -f "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$SHORTCUT_NAME"
+    for name in "${SHORTCUT_NAMES[@]}"; do
+        $USE_SUDO rm -f "$INSTALL_DIR/$name"
+    done
 
     # 清理旧版遗留的 gd / godoc 快捷方式
     $USE_SUDO rm -f "$INSTALL_DIR/gd" "$INSTALL_DIR/godoc"
@@ -57,9 +59,10 @@ echo "📥 安装到 $INSTALL_DIR..."
 $USE_SUDO mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
 $USE_SUDO chmod +x "$INSTALL_DIR/$BINARY_NAME"
 
-# 创建快捷命令
-echo "🔗 创建快捷命令 $SHORTCUT_NAME..."
-$USE_SUDO ln -sf "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$SHORTCUT_NAME"
+for name in "${SHORTCUT_NAMES[@]}"; do
+    echo "🔗 创建快捷命令 $name..."
+    $USE_SUDO ln -sf "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$name"
+done
 
 # 清理旧版遗留的 gd / godoc 快捷方式
 $USE_SUDO rm -f "$INSTALL_DIR/gd" "$INSTALL_DIR/godoc"
@@ -69,4 +72,4 @@ echo -e "\n✅ 安装完成！"
 
 echo -e "\n现在你可以运行："
 echo "  sourcepack   # 主命令（与包名一致）"
-echo "  gdoc         # 快捷命令"
+echo "  gdoc / gdx   # 快捷命令"
